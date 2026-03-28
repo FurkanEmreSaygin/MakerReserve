@@ -1,0 +1,3 @@
+C:\Users\furky\Desktop\Suheda\MakerReserve\Backend\publish\Entities.dll
+C:\Users\furky\Desktop\Suheda\MakerReserve\Backend\publish\Entities.deps.json
+C:\Users\furky\Desktop\Suheda\MakerReserve\Backend\publish\Entities.pdb
