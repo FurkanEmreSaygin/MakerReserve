@@ -333,3 +333,4 @@ C:\Users\furky\Desktop\Suheda\MakerReserve\Backend\API\obj\Debug\net10.0\API.pdb
 C:\Users\furky\Desktop\Suheda\MakerReserve\Backend\API\obj\Debug\net10.0\API.genruntimeconfig.cache
 C:\Users\furky\Desktop\Suheda\MakerReserve\Backend\API\obj\Debug\net10.0\ref\API.dll
 C:\Users\furky\Desktop\Suheda\MakerReserve\Backend\API\bin\Debug\net10.0\dotnet-tools.json
+C:\Users\furky\Desktop\Suheda\MakerReserve\Backend\API\obj\Debug\net10.0\staticwebassets.upToDateCheck.txt

@@ -14,21 +14,38 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<PrinterDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IMachineRepository, MachineRepository>();
 builder.Services.AddScoped<IFilamentRepository, FilamentRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
-// Servislerimiz
+builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
+
+// Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IMachineService, MachineService>();
 builder.Services.AddScoped<IFilamentService, FilamentService>();
 builder.Services.AddScoped<IReservationService, ReservationService>();
-builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
-// 3. CONTROLLER ENTEGRASYONU
 builder.Services.AddControllers();
 
+// --- 🔓 CORS AYARLARI (HEPSİ BURADA) ---
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAllOrigins",
+        policy =>
+        {
+            policy.WithOrigins(
+                    "http://localhost:5173",
+                    "https://maker-reserve.vercel.app",
+                    "https://maker-reserve-puzdoo1cu-furkanemresaygins-projects.vercel.app"
+                  )
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .SetIsOriginAllowedToAllowWildcardSubdomains();
+        });
+});
 
 // 4. JWT KİMLİK DOĞRULAMA
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -46,28 +63,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowReactApp", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173") // React'ın çalıştığı adres
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
-});
-
-
 var app = builder.Build();
 
-// 5. ARA YAZILIMLAR (Middleware) VE YÖNLENDİRMELER
+// --- 🛡️ MIDDLEWARE SIRALAMASI (ÇOK KRİTİK!) ---
+
+// 1. Hata sayfasını ve HTTPS yönlendirmeyi en başa al
 app.UseHttpsRedirection();
 
-app.UseCors("AllowReactApp");
-// Kimlik Doğrulama 
+// 2. CORS'u mutlaka Authentication ve Authorization'dan ÖNCE çalıştır!
+app.UseCors("AllowAllOrigins");
+
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Controller'ların rotalarını (Endpoint'leri) eşleştirir (Örn: /api/auth)
 app.MapControllers();
 
 app.Run();

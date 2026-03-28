@@ -223,7 +223,7 @@ const HomePage = () => {
             <iframe
               width="100%"
               height="400"
-              src="https://www.youtube.com/embed/g2_iO720F1k"
+              src="https://youtu.be/Sagg08DrO5U?list=RDSagg08DrO5U"
               title="3D Yazıcı Kullanım Eğitimi"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
