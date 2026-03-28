@@ -161,7 +161,7 @@ const handleLogout = () => {
             <iframe
               width="100%"
               height="450"
-              src="https://youtu.be/Sagg08DrO5U?list=RDSagg08DrO5U"
+              src="https://www.youtube.com/embed/Sagg08DrO5U?si=5VjtGoSyzIlue5qG"
               title="Eğitim Videosu"
               frameBorder="0"
               allowFullScreen
