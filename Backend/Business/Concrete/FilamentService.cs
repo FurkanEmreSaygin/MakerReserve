@@ -17,14 +17,38 @@ public class FilamentService : IFilamentService
     public async Task<List<FilamentDto>> GetAllFilamentsAsync()
     {
         var filaments = await _filamentRepository.GetAllAsync();
-        return filaments.Select(f => new FilamentDto { Id = f.Id, Name = f.Name, Code = f.Code, FilamentPhoto = f.FilamentPhoto, CurrentWeight = f.CurrentWeight }).ToList();
+        return filaments.Select(f => new FilamentDto
+        {
+            Id = f.Id,
+            Name = f.Name,
+            Code = f.Code,
+            FilamentPhoto = f.FilamentPhoto,
+            CurrentWeight = f.CurrentWeight,
+            TargetGrade = f.TargetGrade 
+        }).ToList();
     }
 
     public async Task<FilamentDto> AddFilamentAsync(FilamentCreateDto filamentDto)
     {
-        var filament = new Filament { Name = filamentDto.Name, Code = filamentDto.Code, FilamentPhoto = filamentDto.FilamentPhoto, CurrentWeight = filamentDto.InitialWeight };
+        var filament = new Filament
+        {
+            Name = filamentDto.Name,
+            Code = filamentDto.Code,
+            FilamentPhoto = filamentDto.FilamentPhoto,
+            CurrentWeight = filamentDto.InitialWeight,
+            TargetGrade = filamentDto.TargetGrade 
+        };
         await _filamentRepository.AddAsync(filament);
-        return new FilamentDto { Id = filament.Id, Name = filament.Name, Code = filament.Code, FilamentPhoto = filament.FilamentPhoto, CurrentWeight = filament.CurrentWeight };
+
+        return new FilamentDto
+        {
+            Id = filament.Id,
+            Name = filament.Name,
+            Code = filament.Code,
+            FilamentPhoto = filament.FilamentPhoto,
+            CurrentWeight = filament.CurrentWeight,
+            TargetGrade = filament.TargetGrade 
+        };
     }
 
     public async Task UpdateFilamentWeightAsync(FilamentUpdateWeightDto updateDto)

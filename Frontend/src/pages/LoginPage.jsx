@@ -100,11 +100,12 @@ const LoginPage = () => {
               margin="normal"
               required
               fullWidth
-              label="Öğrenci Numarası"
+              label="E-posta Adresiniz veya Öğrenci Numaranız"
               name="studentNumber"
               autoFocus
               value={studentNumber}
               onChange={(e) => setStudentNumber(e.target.value)}
+              placeholder="örn: ********@gmail.com veya 123456789"
             />
             <TextField
               margin="normal"

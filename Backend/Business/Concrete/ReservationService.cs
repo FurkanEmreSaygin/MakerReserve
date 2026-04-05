@@ -174,4 +174,47 @@ public class ReservationService : IReservationService
             Status = r.Status
         }).ToList();
     }
+    // YENİ: Admin için Tüm Aktif Randevuları Getir
+    public async Task<List<ReservationDto>> GetAllActiveReservationsAsync()
+    {
+        var reservations = await _reservationRepository.GetAllAsync();
+
+        var activeReservations = reservations
+            .Where(r => r.Status != "Cancelled" && r.EndTime > DateTime.Now)
+            .OrderBy(r => r.StartTime)
+            .ToList();
+
+        return activeReservations.Select(r => new ReservationDto
+        {
+            Id = r.Id,
+            UserName = $"{r.User.FirstName} {r.User.LastName}",
+            StudentNumber = r.User.StudentNumber,
+            PhoneNumber = r.User.PhoneNumber,   
+            MachineName = r.Machine.Name,
+            FilamentName = r.Filament.Name,
+            StartTime = r.StartTime,
+            EndTime = r.EndTime,
+            ExpectedFilamentUsage = r.ExpectedFilamentUsage,
+            PrintType = r.PrintType,
+            Status = r.Status
+        }).ToList();
+    }
+
+    public async Task AdminCancelReservationAsync(int reservationId)
+    {
+        var res = await _reservationRepository.GetByIdAsync(reservationId);
+
+        if (res == null) throw new Exception("Randevu bulunamadı.");
+        if (res.Status == "Cancelled") throw new Exception("Bu randevu zaten iptal edilmiş.");
+
+        res.Status = "Cancelled";
+        await _reservationRepository.UpdateAsync(res);
+
+        var filament = await _filamentRepository.GetByIdAsync(res.FilamentId);
+        if (filament != null)
+        {
+            filament.CurrentWeight += res.ExpectedFilamentUsage;
+            await _filamentRepository.UpdateAsync(filament);
+        }
+    }
 }

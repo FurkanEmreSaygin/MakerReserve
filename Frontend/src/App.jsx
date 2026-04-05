@@ -14,6 +14,7 @@ import AdminPage from "./pages/AdminPage";
 import RegisterPage from "./pages/RegisterPage";
 import ReservationPage from "./pages/ReservationPage";
 import ProfilePage from "./pages/ProfilePage";
+import TrainingPage from "./pages/TrainingPage";
 
 function App() {
   const { user, loading } = useContext(AuthContext);
@@ -53,6 +54,9 @@ function App() {
           path="/profile"
           element={user ? <ProfilePage /> : <Navigate to="/login" />}
         />
+
+        <Route path="/training" element={<TrainingPage />} />
+        
       </Routes>
     </Router>
   );

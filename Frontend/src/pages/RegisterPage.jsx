@@ -10,8 +10,17 @@ import {
   Paper,
   Alert,
   Grid,
+  Checkbox,
+  FormControlLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  MenuItem, // HATA BURADAYDI, EKLENDİ!
 } from "@mui/material";
 import PrintIcon from "@mui/icons-material/Print";
+import CloseIcon from "@mui/icons-material/Close";
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -23,6 +32,7 @@ const RegisterPage = () => {
     phoneNumber: "",
     email: "",
     password: "",
+    grade: "", // SINIF BİLGİSİ
   });
 
   const [loading, setLoading] = useState(false);
@@ -32,6 +42,10 @@ const RegisterPage = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [verifyLoading, setVerifyLoading] = useState(false);
+
+  // --- KVKK İÇİN YENİ STATE'LER ---
+  const [kvkkAccepted, setKvkkAccepted] = useState(false);
+  const [kvkkModalOpen, setKvkkModalOpen] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -117,8 +131,7 @@ const RegisterPage = () => {
 
               <Box component="form" onSubmit={handleRegister}>
                 <Grid container spacing={2}>
-                  {/* 1. SATIR: Ad ve Soyad (xs={6}) */}
-                  <Grid item xs={6}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       name="firstName"
                       required
@@ -129,7 +142,7 @@ const RegisterPage = () => {
                       onChange={handleChange}
                     />
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       name="lastName"
                       required
@@ -139,9 +152,7 @@ const RegisterPage = () => {
                       onChange={handleChange}
                     />
                   </Grid>
-
-                  {/* 2. SATIR: Öğrenci No ve Telefon (xs={6}) */}
-                  <Grid item xs={6}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       name="studentNumber"
                       required
@@ -151,7 +162,7 @@ const RegisterPage = () => {
                       onChange={handleChange}
                     />
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       name="phoneNumber"
                       fullWidth
@@ -160,9 +171,7 @@ const RegisterPage = () => {
                       onChange={handleChange}
                     />
                   </Grid>
-
-                  {/* 3. SATIR: E-posta ve Şifre (xs={6}) */}
-                  <Grid item xs={6}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       name="email"
                       required
@@ -171,10 +180,10 @@ const RegisterPage = () => {
                       type="email"
                       value={formData.email}
                       onChange={handleChange}
-                      helperText="Doğrulama kodu bu adrese gönderilir."
+                      helperText="Doğrulama kodu gönderilecektir."
                     />
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       name="password"
                       required
@@ -185,15 +194,69 @@ const RegisterPage = () => {
                       onChange={handleChange}
                     />
                   </Grid>
+
+                  {/* SINIF SEÇİM ALANI */}
+                  <Grid item xs={12} sm={12}>
+                    <TextField
+                      select
+                      fullWidth
+                      required
+                      label="Sınıfınız"
+                      name="grade"
+                      value={formData.grade}
+                      onChange={handleChange}
+                      helperText="Filament haklarınız sınıfınıza göre belirlenecektir."
+                    >
+                      <MenuItem value={0}>Hazırlık</MenuItem>
+                      <MenuItem value={1}>1. Sınıf</MenuItem>
+                      <MenuItem value={2}>2. Sınıf</MenuItem>
+                      <MenuItem value={3}>3. Sınıf</MenuItem>
+                      <MenuItem value={4}>4. Sınıf</MenuItem>
+                    </TextField>
+                  </Grid>
                 </Grid>
+
+                {/* --- KVKK ONAY KUTUSU --- */}
+                <Box
+                  sx={{ mt: 3, mb: 1, display: "flex", alignItems: "center" }}
+                >
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={kvkkAccepted}
+                        onChange={(e) => setKvkkAccepted(e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label={
+                      <Typography variant="body2">
+                        <span
+                          style={{
+                            color: "#1976d2",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                            fontWeight: "bold",
+                          }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setKvkkModalOpen(true);
+                          }}
+                        >
+                          KVKK Aydınlatma Metni
+                        </span>
+                        'ni okudum ve onaylıyorum.
+                      </Typography>
+                    }
+                  />
+                </Box>
 
                 <Button
                   type="submit"
                   fullWidth
                   variant="contained"
                   size="large"
-                  sx={{ mt: 4, mb: 2, py: 1.5, borderRadius: 2 }}
-                  disabled={loading}
+                  disabled={loading || !kvkkAccepted}
+                  sx={{ mt: 2, mb: 2, py: 1.5, borderRadius: 2 }}
                 >
                   {loading
                     ? "KAYDEDİLİYOR VE MAİL GÖNDERİLİYOR..."
@@ -212,6 +275,7 @@ const RegisterPage = () => {
               </Box>
             </>
           ) : (
+            // DOĞRULAMA KISMI
             <>
               <Typography
                 variant="h5"
@@ -222,7 +286,6 @@ const RegisterPage = () => {
               >
                 E-posta Doğrulama
               </Typography>
-
               <Alert severity="success" sx={{ mb: 3 }}>
                 {success}
               </Alert>
@@ -231,12 +294,10 @@ const RegisterPage = () => {
                   {error}
                 </Alert>
               )}
-
               <Typography variant="body1" align="center" sx={{ mb: 4 }}>
                 <b>{formData.email}</b> adresine gönderdiğimiz 6 haneli
                 doğrulama kodunu aşağıya giriniz.
               </Typography>
-
               <Box component="form" onSubmit={handleVerify}>
                 <TextField
                   required
@@ -270,6 +331,69 @@ const RegisterPage = () => {
           )}
         </Paper>
       </Box>
+
+      {/* KVKK MODALI */}
+      <Dialog
+        open={kvkkModalOpen}
+        onClose={() => setKvkkModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontWeight: "bold",
+          }}
+        >
+          Kişisel Verilerin İşlenmesine İlişkin Aydınlatma Metni
+          <IconButton onClick={() => setKvkkModalOpen(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ backgroundColor: "#fafafa" }}>
+          <Typography variant="body2" paragraph>
+            <strong>1. Veri Sorumlusunun Kimliği</strong>
+            <br />
+            MakerReserve 3D Laboratuvar Randevu Sistemi olarak, kişisel
+            verilerinizin güvenliğine ve gizliliğine en üst düzeyde önem
+            vermekteyiz.
+          </Typography>
+          <Typography variant="body2" paragraph>
+            <strong>2. Kişisel Verilerin İşlenme Amacı</strong>
+            <br />
+            Sistemimize kayıt olurken paylaştığınız bilgileriniz cihaz
+            kullanımlarının takibi amacıyla işlenmektedir.
+          </Typography>
+          <Typography variant="body2" paragraph>
+            <strong>3. Kişisel Verilerin Aktarımı</strong>
+            <br />
+            Kişisel verileriniz hiçbir üçüncü şahısla paylaşılmamaktadır.
+          </Typography>
+          <Typography variant="body2" paragraph>
+            <strong>4. İlgili Kişinin Hakları</strong>
+            <br />
+            KVKK'nın 11. maddesi uyarınca silinmesini talep etme hakkına
+            sahipsiniz.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setKvkkModalOpen(false)} color="inherit">
+            Kapat
+          </Button>
+          <Button
+            onClick={() => {
+              setKvkkModalOpen(false);
+              setKvkkAccepted(true);
+            }}
+            variant="contained"
+            color="primary"
+          >
+            OKUDUM VE ONAYLIYORUM
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

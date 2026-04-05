@@ -23,16 +23,15 @@ import {
   Card,
   TextField,
   InputAdornment,
-  IconButton, // Yukarı taşıdık
+  IconButton,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import QueryBuilderIcon from "@mui/icons-material/QueryBuilder";
 
-// İLK YÜKLEMEDE HAFTA SONUNU ATLAYAN FONKSİYON
 const getInitialWorkingDay = () => {
   const today = new Date();
-  if (today.getDay() === 6) today.setDate(today.getDate() + 2); // Cmt -> Pzt
-  if (today.getDay() === 0) today.setDate(today.getDate() + 1); // Pzr -> Pzt
+  if (today.getDay() === 6) today.setDate(today.getDate() + 2);
+  if (today.getDay() === 0) today.setDate(today.getDate() + 1);
   return today;
 };
 
@@ -40,23 +39,18 @@ const ReservationPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // STATELER
   const [machine, setMachine] = useState(null);
   const [filaments, setFilaments] = useState([]);
   const [selectedDate, setSelectedDate] = useState(getInitialWorkingDay());
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [selectedFilament, setSelectedFilament] = useState("");
-
   const [duration, setDuration] = useState("");
   const [filamentUsage, setFilamentUsage] = useState("");
-
   const [dailyReservations, setDailyReservations] = useState([]);
   const [timeSlots, setTimeSlots] = useState([]);
 
-  // DİNAMİK KOTA STATELERİ
-  const [maxQuota, setMaxQuota] = useState(480); // Varsayılanı 480 tutuyoruz ama DB'den ezilecek
+  const [maxQuota, setMaxQuota] = useState(480);
   const [remainingQuota, setRemainingQuota] = useState(480);
-
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState("");
@@ -65,17 +59,27 @@ const ReservationPage = () => {
   const maxAllowedDate = new Date();
   maxAllowedDate.setDate(maxAllowedDate.getDate() + 14);
 
-  // 1. İLK YÜKLEME: Makine, Filament, Randevular VE Ayarları Getir
+  // YENİ: Öğrencinin Sınıfını Token'dan Alıyoruz
+  let userGrade = 0;
+  const token = localStorage.getItem("token");
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      userGrade = parseInt(payload.Grade || 0);
+    } catch (e) {
+      console.error("Token okuma hatası");
+    }
+  }
+
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        // Ayarları da Promise.all içine ekledik
         const [machineRes, filamentRes, myRes, settingsRes] = await Promise.all(
           [
             api.get("/machine/active"),
             api.get("/filament"),
             api.get("/reservation/my-reservations"),
-            api.get("/settings"), // YENİ: Dinamik limitimizi çekiyoruz
+            api.get("/settings"),
           ],
         );
 
@@ -85,21 +89,18 @@ const ReservationPage = () => {
 
         setFilaments(filamentRes.data);
 
-        // Dinamik Kotayı Ayarla
         const fetchedMaxQuota = settingsRes.data.maxActiveReservationMinutes;
         setMaxQuota(fetchedMaxQuota);
 
-        // Kullanılan Kotayı Hesapla
         const now = new Date();
         const activeMinutesUsed = myRes.data
           .filter((r) => new Date(r.endTime) > now && r.status !== "Cancelled")
-          .reduce((total, r) => {
-            const start = new Date(r.startTime);
-            const end = new Date(r.endTime);
-            return total + (end - start) / 60000;
-          }, 0);
+          .reduce(
+            (total, r) =>
+              total + (new Date(r.endTime) - new Date(r.startTime)) / 60000,
+            0,
+          );
 
-        // Kalan Kotayı Dinamik Limitten Çıkararak Bul
         setRemainingQuota(fetchedMaxQuota - activeMinutesUsed);
       } catch (err) {
         setError("Veriler yüklenirken bir sorun oluştu.");
@@ -110,7 +111,6 @@ const ReservationPage = () => {
     fetchInitialData();
   }, [id]);
 
-  // 2. TARİH DEĞİŞTİKÇE
   useEffect(() => {
     const fetchDailySchedule = async () => {
       try {
@@ -121,15 +121,12 @@ const ReservationPage = () => {
         );
         setDailyReservations(machineReservations);
         generateTimeSlots(machineReservations);
-      } catch (err) {
-        console.error("Günlük plan çekilemedi:", err);
-      }
+      } catch (err) {}
     };
-
     if (machine) fetchDailySchedule();
   }, [selectedDate, machine]);
 
-  // SAAT ÜRETİCİ
+  // YENİ: Dolu saatlerde ismi (bookedBy) alıyoruz
   const generateTimeSlots = (reservations) => {
     const slots = [];
     let currentTime = new Date(selectedDate);
@@ -140,15 +137,18 @@ const ReservationPage = () => {
     while (currentTime < endTime) {
       const slotTimeText = format(currentTime, "HH:mm");
       let isFull = false;
+      let bookedBy = "";
+
       for (let res of reservations) {
         const resStart = new Date(res.startTime);
         const resEnd = new Date(res.endTime);
         if (currentTime >= resStart && currentTime < resEnd) {
           isFull = true;
+          bookedBy = res.userName; // Backend'den gelen isim (veya Dolu yazısı)
           break;
         }
       }
-      slots.push({ time: slotTimeText, isFull });
+      slots.push({ time: slotTimeText, isFull, bookedBy });
       currentTime.setMinutes(currentTime.getMinutes() + 30);
     }
     setTimeSlots(slots);
@@ -159,12 +159,10 @@ const ReservationPage = () => {
     setSelectedSlot(null);
   };
 
-  // RANDEVUYU BACKEND'E GÖNDERME
   const handleSubmitReservation = async () => {
     setSubmitLoading(true);
     setError("");
     setSuccess("");
-
     try {
       const [hours, minutes] = selectedSlot.split(":");
       const startDateTime = new Date(selectedDate);
@@ -183,17 +181,10 @@ const ReservationPage = () => {
         expectedFilamentUsage: parseInt(filamentUsage),
         printType: "Student Project",
       });
-
       setSuccess("Randevunuz başarıyla oluşturuldu! Yönlendiriliyorsunuz...");
-
-      setTimeout(() => {
-        navigate("/profile");
-      }, 2000);
+      setTimeout(() => navigate("/profile"), 2000);
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Randevu alınırken bir hata oluştu. Lütfen saati kontrol edin.",
-      );
+      setError(err.response?.data?.message || "Hata oluştu.");
     } finally {
       setSubmitLoading(false);
     }
@@ -205,11 +196,6 @@ const ReservationPage = () => {
         <CircularProgress />
       </Box>
     );
-
-  // Dinamik Kota Saat/Dakika Hesaplamaları
-  const maxHours = Math.floor(maxQuota / 60);
-  const remainingHours = Math.floor(remainingQuota / 60);
-  const remainingMins = Math.round(remainingQuota % 60);
 
   return (
     <>
@@ -239,80 +225,20 @@ const ReservationPage = () => {
           </Alert>
         )}
 
-        {/* DİNAMİK KOTA GÖSTERGESİ */}
-        <Alert
-          severity={remainingQuota <= 60 ? "warning" : "info"}
-          sx={{ mb: 4, fontSize: "1.1rem", alignItems: "center" }}
-        >
-          Aynı anda alabileceğiniz maksimum aktif baskı süresi:{" "}
-          <b>
-            {maxHours} Saat ({maxQuota} dk)
-          </b>
-          . Şu an kullanılabilir hakkınız:{" "}
-          <b style={{ fontSize: "1.2rem", color: "#d32f2f" }}>
-            {remainingHours} Saat {remainingMins} Dakika
-          </b>
-        </Alert>
-
         <Paper
-          elevation={2}
+          elevation={3}
           sx={{
-            p: 2,
+            p: 3,
             mb: 4,
             borderRadius: 3,
-            backgroundColor: "#fcfcfc",
-            border: "1px solid #eee",
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <img
-              src={machine.machinePhoto || "https://via.placeholder.com/80"}
-              alt={machine.name}
-              style={{
-                width: 60,
-                height: 60,
-                objectFit: "cover",
-                borderRadius: 8,
-              }}
-            />
-            <Box>
-              <Typography variant="h6" fontWeight="bold">
-                {machine.name}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Randevu işlemi aşağıdan tamamlanacak.
-              </Typography>
-            </Box>
-          </Box>
-        </Paper>
-
-        <Box
-          sx={{
             display: "flex",
-            gap: 3,
-            flexWrap: { xs: "wrap", md: "nowrap" },
+            flexWrap: "wrap",
+            gap: 4,
           }}
         >
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              borderRadius: 3,
-              flex: "0 1 auto",
-              maxWidth: { md: "360px" },
-              maxHeight: "420px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-          >
-            <Typography
-              variant="h6"
-              fontWeight="bold"
-              gutterBottom
-              sx={{ alignSelf: "flex-start" }}
-            >
-              Tarih Seçin
+          <Box flex={1}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              1. Tarih Seçin
             </Typography>
             <Calendar
               onChange={handleDateChange}
@@ -322,22 +248,12 @@ const ReservationPage = () => {
               tileDisabled={({ date }) =>
                 date.getDay() === 0 || date.getDay() === 6
               }
-              className="custom-calendar"
             />
-          </Paper>
-
-          <Paper elevation={3} sx={{ p: 3, borderRadius: 3, flex: "1 1 auto" }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-              <QueryBuilderIcon color="primary" />
-              <Typography variant="h6" fontWeight="bold">
-                {format(selectedDate, "d MMMM yyyy, EEEE", { locale: tr })}
-              </Typography>
-            </Box>
-
-            <Divider sx={{ mb: 3 }} />
-
-            <Typography variant="body1" fontWeight="medium" gutterBottom>
-              1. Uygun Saatler (Başlangıç Saati)
+          </Box>
+          <Box flex={2}>
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              2. Saat Seçimi (
+              {format(selectedDate, "d MMMM yyyy", { locale: tr })})
             </Typography>
             <Grid container spacing={1} sx={{ mb: 4 }}>
               {timeSlots.map((slot) => (
@@ -361,34 +277,36 @@ const ReservationPage = () => {
                         : selectedSlot === slot.time
                           ? "primary.light"
                           : "#f9f9f9",
-                      color: slot.isFull
-                        ? "#d32f2f"
-                        : selectedSlot === slot.time
-                          ? "primary.contrastText"
-                          : "text.primary",
-                      transition: "0.2s",
-                      "&:hover": {
-                        backgroundColor: slot.isFull
-                          ? "#ffebee"
-                          : selectedSlot === slot.time
-                            ? "primary.light"
-                            : "#f0f0f0",
-                      },
                     }}
                   >
-                    <Typography variant="body1" fontWeight="bold">
+                    <Typography
+                      variant="body1"
+                      fontWeight="bold"
+                      color={
+                        slot.isFull
+                          ? "#d32f2f"
+                          : selectedSlot === slot.time
+                            ? "primary.contrastText"
+                            : "text.primary"
+                      }
+                    >
                       {slot.time}
                     </Typography>
-                    <Typography variant="caption">
-                      {slot.isFull ? "Dolu" : "Boş"}
+
+                    {/* YENİ: Doluysa kişiyi göster */}
+                    <Typography
+                      variant="caption"
+                      color={slot.isFull ? "#d32f2f" : "inherit"}
+                    >
+                      {slot.isFull ? `(${slot.bookedBy})` : "Boş"}
                     </Typography>
                   </Card>
                 </Grid>
               ))}
             </Grid>
 
-            <Typography variant="body1" fontWeight="medium" gutterBottom>
-              2. Baskı Detayları
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              3. Baskı Detayları
             </Typography>
             <Grid container spacing={2} sx={{ mb: 4 }}>
               <Grid item xs={12} sm={6}>
@@ -401,10 +319,9 @@ const ReservationPage = () => {
                   onChange={(e) => setDuration(e.target.value)}
                   InputProps={{
                     endAdornment: (
-                      <InputAdornment position="end">Dakika</InputAdornment>
+                      <InputAdornment position="end">Dk</InputAdornment>
                     ),
                   }}
-                  helperText="Sistem otomatik olarak 30 dakikalık bloklara yuvarlayacaktır."
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -417,47 +334,48 @@ const ReservationPage = () => {
                   onChange={(e) => setFilamentUsage(e.target.value)}
                   InputProps={{
                     endAdornment: (
-                      <InputAdornment position="end">Gram</InputAdornment>
+                      <InputAdornment position="end">Gr</InputAdornment>
                     ),
                   }}
-                  helperText="Dilimleyici (Slicer) programında yazan tahmini gramajı giriniz."
                 />
               </Grid>
             </Grid>
 
-            <Typography variant="body1" fontWeight="medium" gutterBottom>
-              3. Filament Seçimi
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              4. Filament Seçimi (Sınıf:{" "}
+              {userGrade === 0 ? "Hazırlık" : userGrade + ". Sınıf"})
             </Typography>
             <FormControl fullWidth sx={{ mb: 4 }}>
-              <InputLabel id="filament-select-label">
-                Renk/Malzeme Seçin
-              </InputLabel>
+              <InputLabel>Renk/Malzeme Seçin</InputLabel>
               <Select
-                labelId="filament-select-label"
                 value={selectedFilament}
                 label="Renk/Malzeme Seçin"
                 onChange={(e) => setSelectedFilament(e.target.value)}
               >
-                {filaments.length === 0 ? (
-                  <MenuItem disabled>Henüz filament eklenmemiş</MenuItem>
+                {/* YENİ: Sadece Kendi Sınıfının Filamentlerini Göster */}
+                {filaments.filter((f) => f.targetGrade === userGrade).length ===
+                0 ? (
+                  <MenuItem disabled>
+                    Sınıfınıza uygun filament bulunmamaktadır.
+                  </MenuItem>
                 ) : (
-                  filaments.map((f) => (
-                    <MenuItem
-                      key={f.id}
-                      value={f.id}
-                      disabled={f.currentWeight < parseInt(filamentUsage || 0)}
-                    >
-                      <b>{f.name}</b> &nbsp;-&nbsp; {f.code} &nbsp; (
-                      {f.currentWeight} gr kaldı)
-                      {f.currentWeight < parseInt(filamentUsage || 0) &&
-                        " (Yetersiz)"}
-                    </MenuItem>
-                  ))
+                  filaments
+                    .filter((f) => f.targetGrade === userGrade)
+                    .map((f) => (
+                      <MenuItem
+                        key={f.id}
+                        value={f.id}
+                        disabled={
+                          f.currentWeight < parseInt(filamentUsage || 0)
+                        }
+                      >
+                        <b>{f.name}</b> &nbsp;-&nbsp; {f.code} &nbsp; (
+                        {f.currentWeight} gr kaldı)
+                      </MenuItem>
+                    ))
                 )}
               </Select>
             </FormControl>
-
-            <Divider sx={{ mb: 3 }} />
 
             <Button
               fullWidth
@@ -477,8 +395,8 @@ const ReservationPage = () => {
             >
               {submitLoading ? "Randevu İşleniyor..." : "Randevuyu Tamamla"}
             </Button>
-          </Paper>
-        </Box>
+          </Box>
+        </Paper>
       </Container>
     </>
   );

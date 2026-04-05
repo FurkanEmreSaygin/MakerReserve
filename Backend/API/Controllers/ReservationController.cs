@@ -71,5 +71,34 @@ namespace API.Controllers
             await _reservationService.CancelReservationAsync(id, int.Parse(userIdStr));
             return Ok(new { message = "Randevu başarıyla iptal edildi ve filament iade edildi." });
         }
+        [HttpGet("admin/active")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetAllActiveReservations()
+        {
+            try
+            {
+                var result = await _reservationService.GetAllActiveReservationsAsync();
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPut("admin/cancel/{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AdminCancelReservation(int id)
+        {
+            try
+            {
+                await _reservationService.AdminCancelReservationAsync(id);
+                return Ok(new { message = "Randevu admin tarafından başarıyla iptal edildi." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     } 
 }

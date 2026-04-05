@@ -25,4 +25,6 @@ public class UserRegisterDto
     public string Password { get; set; } = string.Empty;
 
     public string Email { get; set; } = string.Empty;
+
+    public int Grade { get; set; }
 }

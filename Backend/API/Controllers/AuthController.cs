@@ -76,7 +76,23 @@ namespace API.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+        
+        [HttpPost("upgrade-grades")]
+        [Authorize(Roles = "Admin")] // Sadece Adminler sınıf atlatabilir
+        public async Task<IActionResult> UpgradeGrades()
+        {
+            try
+            {
+                await _authService.UpgradeAllGradesAsync();
+                return Ok(new { message = "Tüm öğrencilerin sınıfları başarıyla yükseltildi." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
+    
 
     // E-posta doğrulama için gerekli DTO (Aynı dosyanın en altında durabilir)
     public class VerifyEmailDto

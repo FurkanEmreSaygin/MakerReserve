@@ -12,5 +12,6 @@ namespace Entities
         public string Code { get; set; } = string.Empty;
         public string FilamentPhoto { get; set; } = string.Empty;
         public int CurrentWeight { get; set; }
+        public int TargetGrade { get; set; }
     }
 }

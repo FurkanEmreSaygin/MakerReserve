@@ -9,4 +9,6 @@ public interface IReservationService
     Task<List<ReservationDto>> GetDailyReservationsAsync(DateTime date);
     Task<List<ReservationDto>> GetMyReservationsAsync(int userId);
     Task CancelReservationAsync(int reservationId, int userId);
+    Task<List<ReservationDto>> GetAllActiveReservationsAsync();
+    Task AdminCancelReservationAsync(int reservationId);
 }

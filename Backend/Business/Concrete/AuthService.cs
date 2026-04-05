@@ -25,13 +25,17 @@ public class AuthService : IAuthService
 
     public async Task<UserDto> RegisterAsync(UserRegisterDto registerDto)
     {
-        var existingUser = await _userRepository.GetByStudentNumberAsync(registerDto.StudentNumber);
-        if (existingUser != null)
+        var existingUserByNumber = await _userRepository.GetByStudentNumberAsync(registerDto.StudentNumber);
+        if (existingUserByNumber != null)
             throw new Exception("Bu öğrenci numarası ile zaten kayıt olunmuş.");
+
+        // 2. E-posta Kontrolü
+        var existingUserByEmail = await _userRepository.GetByEmailAsync(registerDto.Email);
+        if (existingUserByEmail != null)
+            throw new Exception("Bu e-posta adresi sistemde zaten kayıtlı. Lütfen farklı bir adres deneyin.");
 
         // 6 Haneli Rastgele Doğrulama Kodu Üret
         string verificationCode = new Random().Next(100000, 999999).ToString();
-
         var user = new User
         {
             StudentNumber = registerDto.StudentNumber,
@@ -41,8 +45,7 @@ public class AuthService : IAuthService
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password),
             Role = "Student",
             HasCompletedTraining = false,
-
-            // YENİ: Mail doğrulama alanları
+            Grade = registerDto.Grade,
             Email = registerDto.Email,
             IsEmailVerified = false,
             EmailVerificationCode = verificationCode
@@ -67,15 +70,25 @@ public class AuthService : IAuthService
 
     public async Task<string> LoginAsync(UserLoginDto loginDto)
     {
-        var user = await _userRepository.GetByStudentNumberAsync(loginDto.StudentNumber);
+        User user;
+
+        // YENİ: İçinde @ işareti varsa Email, yoksa Öğrenci Numarası olarak arayacağız
+        if (loginDto.StudentNumber.Contains("@"))
+        {
+            user = await _userRepository.GetByEmailAsync(loginDto.StudentNumber);
+        }
+        else
+        {
+            user = await _userRepository.GetByStudentNumberAsync(loginDto.StudentNumber);
+        }
+
         if (user == null)
-            throw new Exception("Kullanıcı bulunamadı.");
+            throw new Exception("Kullanıcı bulunamadı. Girdiğiniz bilgileri kontrol edin.");
 
         bool isPasswordValid = BCrypt.Net.BCrypt.Verify(loginDto.Password, user.PasswordHash);
         if (!isPasswordValid)
             throw new Exception("Şifre hatalı.");
 
-        // YENİ: Mail onayı yapılmamışsa girişi engelle!
         if (!user.IsEmailVerified)
             throw new Exception("Lütfen giriş yapmadan önce e-posta adresinize gelen kodu onaylayın.");
 
@@ -125,8 +138,8 @@ public class AuthService : IAuthService
             new Claim(ClaimTypes.Name, user.FirstName),
             new Claim(ClaimTypes.Role, user.Role),
             new Claim("StudentNumber", user.StudentNumber),
-            // YENİ: Eğitim durumunu token'a ekledik
-            new Claim("HasCompletedTraining", user.HasCompletedTraining.ToString())
+            new Claim("HasCompletedTraining", user.HasCompletedTraining.ToString()),
+            new Claim("Grade", user.Grade.ToString())
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? "VarsayilanCokGizliBirAnahtarGirmelisinBuraya123!"));
@@ -141,5 +154,22 @@ public class AuthService : IAuthService
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+    // YENİ: Yıllık Sınıf Atlatma Metodu
+    public async Task UpgradeAllGradesAsync()
+    {
+        var users = await _userRepository.GetAllAsync();
+
+        foreach (var user in users)
+        {
+            // Sadece öğrencileri etkilesin, Adminlerin sınıfı değişmez
+            if (user.Role == "Admin") continue;
+
+            if (user.Grade < 4)
+            {
+                user.Grade += 1; // Sınıfı 1 arttır
+                await _userRepository.UpdateAsync(user);
+            }
+        }
     }
 }

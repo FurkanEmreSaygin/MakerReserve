@@ -12,5 +12,6 @@ public interface IUserRepository
     Task DeleteAsync(int id);
 
     // Öğrenci numarasına göre kullanıcıyı bulma
+    Task<User?> GetByEmailAsync(string email);
     Task<User?> GetByStudentNumberAsync(string studentNumber);
 }

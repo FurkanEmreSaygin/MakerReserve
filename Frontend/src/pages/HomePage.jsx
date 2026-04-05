@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import api from "../services/api";
+import YouTube from "react-youtube"; // YENİ: Kütüphaneyi ekledik
 import {
   Container,
   Typography,
@@ -28,9 +29,10 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // EĞİTİM VİDEOSU İÇİN STATE
+  // EĞİTİM VİDEOSU İÇİN STATE'LER
   const [showTraining, setShowTraining] = useState(false);
   const [trainingLoading, setTrainingLoading] = useState(false);
+  const [isVideoWatched, setIsVideoWatched] = useState(false); // YENİ: Videonun bitip bitmediğini tutar
 
   const navigate = useNavigate();
 
@@ -40,11 +42,9 @@ const HomePage = () => {
       const token = localStorage.getItem("token");
       if (token) {
         try {
-          // Token'ı çözümlüyoruz (atob ile)
           const payload = JSON.parse(atob(token.split(".")[1]));
-          // C# boolean değeri "False" olarak string'e çevirir
           if (payload.HasCompletedTraining === "False") {
-            setShowTraining(true); // Eğitimi tamamlamamış, videoyu göster!
+            setShowTraining(true);
           }
         } catch (e) {
           console.error("Token okunamadı", e);
@@ -68,15 +68,31 @@ const HomePage = () => {
     fetchActiveMachines();
   }, []);
 
+  // --- YOUTUBE VİDEO AYARLARI VE FONKSİYONLARI ---
+  const onVideoEnd = () => {
+    setIsVideoWatched(true); // Video gerçekten bittiğinde kilidi aç
+  };
+
+  const videoOptions = {
+    height: "400",
+    width: "100%",
+    playerVars: {
+      autoplay: 0,
+      rel: 0, // İlgisiz videoları önermeyi kapatır
+      modestbranding: 1, // YouTube logosunu gizler
+      controls: 0, // İŞTE SİHİR BU! İlerleme çubuğunu tamamen gizler
+      disablekb: 1, // Klavyedeki yön tuşlarıyla ileri sarmayı engeller
+      fs: 0, // Tam ekran modunu kapatır (Modal dışına çıkmasınlar diye)
+    },
+  };
+
   // EĞİTİMİ TAMAMLA BUTONUNA BASILINCA
   const handleCompleteTraining = async () => {
     setTrainingLoading(true);
     try {
       const res = await api.post("/auth/complete-training");
-      // Backend'den gelen yeni (HasCompletedTraining=True olan) token'ı kaydediyoruz
       localStorage.setItem("token", res.data.token);
       setShowTraining(false);
-      // Uygulamanın yeni token'ı algılaması için sayfayı yumuşakça yeniliyoruz
       window.location.reload();
     } catch (err) {
       alert("Eğitim tamamlanırken bir hata oluştu.");
@@ -214,38 +230,41 @@ const HomePage = () => {
         <DialogContent>
           <Typography variant="body1" sx={{ mb: 3, textAlign: "center" }}>
             Laboratuvardaki 3D yazıcıları kullanabilmek ve randevu alabilmek
-            için aşağıdaki eğitim videosunu izlemeniz ve kuralları kabul etmeniz
-            gerekmektedir.
+            için aşağıdaki eğitim videosunu <b>sonuna kadar</b> izlemeniz ve
+            kuralları kabul etmeniz gerekmektedir. (Not: Videoyu ileri
+            saramazsınız).
           </Typography>
 
-          {/* YOUTUBE VİDEOSU (Örnek bir 3D Yazıcı eğitim videosu koydum, src kısmını kendi videonla değiştirebilirsin) */}
           <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-            <iframe
-              width="100%"
-              height="400"
-              src="https://www.youtube.com/embed/59xZGr05_TY?si=_UyTI21qH_t4pXJs"
-              title="3D Yazıcı Kullanım Eğitimi"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{ borderRadius: "8px" }}
-            ></iframe>
+            <YouTube
+              videoId="59xZGr05_TY"
+              opts={videoOptions}
+              onEnd={onVideoEnd}
+              style={{
+                width: "100%",
+                borderRadius: "8px",
+                overflow: "hidden",
+                border: "2px solid #eee",
+              }}
+            />
           </Box>
         </DialogContent>
 
         <DialogActions sx={{ p: 3, justifyContent: "center" }}>
           <Button
             variant="contained"
-            color="success"
+            color={isVideoWatched ? "success" : "inherit"} // İzlenmediyse gri durur
             size="large"
             startIcon={<VerifiedUserIcon />}
             onClick={handleCompleteTraining}
-            disabled={trainingLoading}
+            disabled={!isVideoWatched || trainingLoading} // İzlenmediyse buton KİLİTLİ
             sx={{ px: 4, py: 1.5, borderRadius: 2 }}
           >
             {trainingLoading
               ? "Onaylanıyor..."
-              : "VİDEOYU İZLEDİM VE KURALLARI KABUL EDİYORUM"}
+              : !isVideoWatched
+                ? "LÜTFEN VİDEOYU SONUNA KADAR İZLEYİN"
+                : "VİDEOYU İZLEDİM VE KURALLARI KABUL EDİYORUM"}
           </Button>
         </DialogActions>
       </Dialog>

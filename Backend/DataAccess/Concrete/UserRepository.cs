@@ -57,4 +57,10 @@ public class UserRepository : IUserRepository
         // Öğrenci numarası eşleşen kullanıcıyı getir
         return await _context.Users.FirstOrDefaultAsync(u => u.StudentNumber == studentNumber);
     }
+
+    public async Task<User?> GetByEmailAsync(string email)
+    {
+        // E-posta adresi eşleşen kullanıcıyı getir
+        return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+    }
 }

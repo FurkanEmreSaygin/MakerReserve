@@ -8,4 +8,5 @@ public interface IAuthService
     Task<string> LoginAsync(UserLoginDto loginDto);
     Task VerifyEmailAsync(string studentNumber, string code);
     Task<string> CompleteTrainingAsync(int userId);
+    Task UpgradeAllGradesAsync();
 }

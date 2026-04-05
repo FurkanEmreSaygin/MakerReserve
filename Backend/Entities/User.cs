@@ -1,10 +1,9 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
 namespace Entities
 {
+    [Index(nameof(Email), IsUnique = true)]
+    [Index(nameof(StudentNumber), IsUnique = true)]
     public class User
     {
         public int Id { get; set; }
@@ -12,7 +11,8 @@ namespace Entities
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public string PhoneNumber { get; set; } = string.Empty;
-        public string PasswordHash { get; set; } = string.Empty; 
+        public string PasswordHash { get; set; } = string.Empty;
+        public int Grade { get; set; }
 
         // Kullanıcı eğitim videolarını bitirdi mi?
         public bool HasCompletedTraining { get; set; } = false;
