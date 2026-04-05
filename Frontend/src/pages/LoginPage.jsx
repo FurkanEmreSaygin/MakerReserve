@@ -8,45 +8,80 @@ import {
   Typography,
   TextField,
   Button,
-  Alert,
   Paper,
+  Alert,
 } from "@mui/material";
 import PrintIcon from "@mui/icons-material/Print";
 
 const LoginPage = () => {
-  // Formdaki verileri tutacağımız state'ler
-  const [studentNumber, setStudentNumber] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  // Context'ten giriş yapma fonksiyonunu ve yönlendirme aracını alıyoruz
-  const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault(); // Sayfanın yenilenmesini engeller
-    setError("");
+  // Normal Giriş State'leri
+  const [formData, setFormData] = useState({ studentNumber: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  // Doğrulama Ekranı State'leri
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verifyLoading, setVerifyLoading] = useState(false);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // --- GİRİŞ YAPMA İŞLEMİ ---
+  const handleLogin = async (e) => {
+    e.preventDefault();
     setLoading(true);
-
+    setError("");
     try {
-      // Backend'e giriş isteği atıyoruz
-      const response = await api.post("/auth/login", {
-        studentNumber,
-        password,
-      });
-
-      // Başarılı olursa token'ı context'e kaydedip anasayfaya yönlendiriyoruz
-      login(response.data.token);
+      const res = await api.post("/auth/login", formData);
+      login(res.data.token);
       navigate("/");
     } catch (err) {
-      // Hata varsa (yanlış şifre vb.) C#'tan gelen hata mesajını ekrana yazdırıyoruz
-      setError(
-        err.response?.data?.message ||
-          "Giriş yapılamadı. Lütfen tekrar deneyin.",
-      );
+      const errorMessage = err.response?.data?.message;
+
+      // EĞER BACKEND BİZE "UNVERIFIED_USER" DÖNDÜYSE
+      if (errorMessage === "UNVERIFIED_USER") {
+        setError(""); // Hatayı temizle
+        setSuccess(
+          "Hesabınız doğrulanmamış. E-posta adresinize YENİ bir kod gönderdik!",
+        );
+        setIsVerifying(true); // Ekranı doğrulama moduna geçir
+      } else {
+        // Normal bir hataysa (Şifre yanlış vs.) ekrana yazdır
+        setError(errorMessage || "Giriş başarısız.");
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // --- KODU DOĞRULAMA İŞLEMİ ---
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    setVerifyLoading(true);
+    setError("");
+    try {
+      // Backend'e kodu gönderiyoruz
+      await api.post("/auth/verify-email", {
+        studentNumber: formData.studentNumber, // Giriş yaparken yazdığı Öğrenci No veya E-posta
+        code: verificationCode,
+      });
+
+      alert("Hesabınız başarıyla doğrulandı! Şimdi giriş yapabilirsiniz.");
+
+      // Başarılı olunca normal giriş ekranına geri döndür (şifresini tekrar girip girsin)
+      setIsVerifying(false);
+      setSuccess("Lütfen giriş yapınız.");
+      setVerificationCode("");
+    } catch (err) {
+      setError(err.response?.data?.message || "Doğrulama kodu hatalı.");
+    } finally {
+      setVerifyLoading(false);
     }
   };
 
@@ -60,7 +95,6 @@ const LoginPage = () => {
           alignItems: "center",
         }}
       >
-        {/* Yuvarlak şık bir Logo ve Başlık alanı */}
         <Box
           sx={{
             display: "flex",
@@ -70,82 +104,147 @@ const LoginPage = () => {
           }}
         >
           <PrintIcon sx={{ fontSize: 40, mr: 1 }} />
-          <Typography component="h1" variant="h4" fontWeight="bold">
+          <Typography variant="h4" fontWeight="bold">
             MakerReserve
           </Typography>
         </Box>
 
-        <Paper
-          elevation={4}
-          sx={{ padding: 4, width: "100%", borderRadius: 3 }}
-        >
-          <Typography
-            component="h2"
-            variant="h5"
-            align="center"
-            gutterBottom
-            fontWeight="medium"
-          >
-            Giriş Yap
-          </Typography>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleSubmit} noValidate>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="E-posta Adresiniz veya Öğrenci Numaranız"
-              name="studentNumber"
-              autoFocus
-              value={studentNumber}
-              onChange={(e) => setStudentNumber(e.target.value)}
-              placeholder="örn: ********@gmail.com veya 123456789"
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Şifre"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              size="large"
-              sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: 2 }}
-              disabled={loading}
-            >
-              {loading ? "Giriş Yapılıyor..." : "Giriş Yap"}
-            </Button>
-
-            {/* Kayıt sayfasına geçiş butonu/linki */}
-            <Box textAlign="center" mt={2}>
-              <Typography variant="body2" color="text.secondary">
-                Hesabınız yok mu?{" "}
-                <Link
-                  to="/register"
-                  style={{
-                    color: "#1976d2",
-                    textDecoration: "none",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Hemen Kayıt Olun
-                </Link>
+        <Paper elevation={4} sx={{ p: 4, width: "100%", borderRadius: 3 }}>
+          {/* EĞER DOĞRULAMA EKRANINDA DEĞİLSEK NORMAL GİRİŞ FORMUNU GÖSTER */}
+          {!isVerifying ? (
+            <>
+              <Typography
+                variant="h5"
+                align="center"
+                gutterBottom
+                fontWeight="bold"
+              >
+                Giriş Yap
               </Typography>
-            </Box>
-          </Box>
+
+              {success && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  {success}
+                </Alert>
+              )}
+              {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {error}
+                </Alert>
+              )}
+
+              <Box component="form" onSubmit={handleLogin}>
+                <TextField
+                  margin="normal"
+                  required
+                  fullWidth
+                  label="Öğrenci Numarası veya E-posta"
+                  name="studentNumber"
+                  autoFocus
+                  value={formData.studentNumber}
+                  onChange={handleChange}
+                />
+                <TextField
+                  margin="normal"
+                  required
+                  fullWidth
+                  name="password"
+                  label="Şifre"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                />
+
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  size="large"
+                  disabled={loading}
+                  sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: 2 }}
+                >
+                  {loading ? "Giriş Yapılıyor..." : "Giriş Yap"}
+                </Button>
+
+                <Typography align="center" variant="body2">
+                  Hesabınız yok mu?{" "}
+                  <Link
+                    to="/register"
+                    style={{ textDecoration: "none", fontWeight: "bold" }}
+                  >
+                    Kayıt Olun
+                  </Link>
+                </Typography>
+              </Box>
+            </>
+          ) : (
+            // EĞER "UNVERIFIED_USER" YAKALANDIYSA DOĞRULAMA EKRANINI GÖSTER
+            <>
+              <Typography
+                variant="h5"
+                align="center"
+                gutterBottom
+                fontWeight="bold"
+                color="primary"
+              >
+                Hesabı Doğrula
+              </Typography>
+
+              {success && (
+                <Alert severity="success" sx={{ mb: 3 }}>
+                  {success}
+                </Alert>
+              )}
+              {error && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                  {error}
+                </Alert>
+              )}
+
+              <Typography variant="body2" align="center" sx={{ mb: 3 }}>
+                Girdiğiniz bilgilere ait e-posta adresine 6 haneli yeni bir kod
+                gönderdik. Lütfen aşağıya giriniz.
+              </Typography>
+
+              <Box component="form" onSubmit={handleVerify}>
+                <TextField
+                  required
+                  fullWidth
+                  label="6 Haneli Kodu Girin"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  inputProps={{
+                    maxLength: 6,
+                    style: {
+                      textAlign: "center",
+                      fontSize: "24px",
+                      letterSpacing: "8px",
+                      fontWeight: "bold",
+                    },
+                  }}
+                />
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  color="success"
+                  size="large"
+                  sx={{ mt: 4, mb: 2, py: 1.5, borderRadius: 2 }}
+                  disabled={verifyLoading || verificationCode.length !== 6}
+                >
+                  {verifyLoading ? "DOĞRULANIYOR..." : "HESABIMI DOĞRULA"}
+                </Button>
+
+                <Button
+                  fullWidth
+                  variant="text"
+                  onClick={() => setIsVerifying(false)}
+                >
+                  Giriş Ekranına Dön
+                </Button>
+              </Box>
+            </>
+          )}
         </Paper>
       </Box>
     </Container>

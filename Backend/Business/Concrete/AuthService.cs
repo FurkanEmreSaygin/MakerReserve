@@ -25,17 +25,52 @@ public class AuthService : IAuthService
 
     public async Task<UserDto> RegisterAsync(UserRegisterDto registerDto)
     {
-        var existingUserByNumber = await _userRepository.GetByStudentNumberAsync(registerDto.StudentNumber);
-        if (existingUserByNumber != null)
-            throw new Exception("Bu öğrenci numarası ile zaten kayıt olunmuş.");
-
-        // 2. E-posta Kontrolü
-        var existingUserByEmail = await _userRepository.GetByEmailAsync(registerDto.Email);
-        if (existingUserByEmail != null)
-            throw new Exception("Bu e-posta adresi sistemde zaten kayıtlı. Lütfen farklı bir adres deneyin.");
-
         // 6 Haneli Rastgele Doğrulama Kodu Üret
         string verificationCode = new Random().Next(100000, 999999).ToString();
+
+        // 1. Kullanıcıyı Öğrenci Numarası veya Email ile ara
+        var existingUserByNumber = await _userRepository.GetByStudentNumberAsync(registerDto.StudentNumber);
+        var existingUserByEmail = await _userRepository.GetByEmailAsync(registerDto.Email);
+
+        // Kullanıcının sistemde herhangi bir şekilde (email veya no) kaydı var mı?
+        var existingUser = existingUserByNumber ?? existingUserByEmail;
+
+        if (existingUser != null)
+        {
+            if (existingUser.IsEmailVerified)
+            {
+                // Kullanıcı var ve DOĞRULANMIŞSA hata ver
+                throw new Exception("Bu e-posta adresi veya öğrenci numarası zaten kullanımda.");
+            }
+            else
+            {
+                existingUser.FirstName = registerDto.FirstName;
+                existingUser.LastName = registerDto.LastName;
+                existingUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
+                existingUser.Grade = registerDto.Grade;
+                existingUser.StudentNumber = registerDto.StudentNumber;
+                existingUser.Email = registerDto.Email;
+
+                existingUser.EmailVerificationCode = verificationCode;
+
+                await _userRepository.UpdateAsync(existingUser);
+
+                await _emailService.SendVerificationEmailAsync(existingUser.Email, verificationCode);
+
+                return new UserDto
+                {
+                    Id = existingUser.Id,
+                    StudentNumber = existingUser.StudentNumber,
+                    FirstName = existingUser.FirstName,
+                    LastName = existingUser.LastName,
+                    PhoneNumber = existingUser.PhoneNumber,
+                    Role = existingUser.Role,
+                    HasCompletedTraining = existingUser.HasCompletedTraining
+                };
+            }
+        }
+
+        // 2. Eğer kullanıcı hiç yoksa, sıfırdan oluşturma kısmı
         var user = new User
         {
             StudentNumber = registerDto.StudentNumber,
@@ -72,7 +107,7 @@ public class AuthService : IAuthService
     {
         User user;
 
-        // YENİ: İçinde @ işareti varsa Email, yoksa Öğrenci Numarası olarak arayacağız
+        // İçinde @ işareti varsa Email, yoksa Öğrenci Numarası olarak arayacağız
         if (loginDto.StudentNumber.Contains("@"))
         {
             user = await _userRepository.GetByEmailAsync(loginDto.StudentNumber);
@@ -90,12 +125,21 @@ public class AuthService : IAuthService
             throw new Exception("Şifre hatalı.");
 
         if (!user.IsEmailVerified)
-            throw new Exception("Lütfen giriş yapmadan önce e-posta adresinize gelen kodu onaylayın.");
+        {
+            string newCode = new Random().Next(100000, 999999).ToString();
+
+            user.EmailVerificationCode = newCode;
+            await _userRepository.UpdateAsync(user);
+
+            await _emailService.SendVerificationEmailAsync(user.Email, newCode);
+
+            throw new Exception("UNVERIFIED_USER");
+        }
 
         return GenerateJwtToken(user);
     }
 
-    // YENİ: E-posta Doğrulama Metodu
+    // E-posta Doğrulama Metodu
     public async Task VerifyEmailAsync(string studentNumber, string code)
     {
         var user = await _userRepository.GetByStudentNumberAsync(studentNumber);
@@ -116,7 +160,7 @@ public class AuthService : IAuthService
         await _userRepository.UpdateAsync(user);
     }
 
-    // YENİ: Eğitimi Tamamlama Metodu
+    // Eğitimi Tamamlama Metodu
     public async Task<string> CompleteTrainingAsync(int userId)
     {
         var user = await _userRepository.GetByIdAsync(userId);
@@ -155,7 +199,8 @@ public class AuthService : IAuthService
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-    // YENİ: Yıllık Sınıf Atlatma Metodu
+
+    // Yıllık Sınıf Atlatma Metodu
     public async Task UpgradeAllGradesAsync()
     {
         var users = await _userRepository.GetAllAsync();
